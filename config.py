@@ -1,37 +1,37 @@
 import os
 from datetime import datetime
 
+basedir = os.path.abspath(os.path.dirname(__file__))
+
 class Config:
-    SECRET_KEY = os.environ.get('SECRET_KEY', 'scholarship-management-secret-key-2024')
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'sqlite:///scholarship.db')
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'scholarship-management-secret-key'
+    
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
+        'sqlite:///' + os.path.join(basedir, 'scholarship.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-
-    SMS_ENABLED = os.environ.get('SMS_ENABLED', 'false')
-    SMS_API_KEY = os.environ.get('SMS_API_KEY', '')
-    SMS_API_SECRET = os.environ.get('SMS_API_SECRET', '')
-
-    CAMPUS_PLATFORM_ENABLED = os.environ.get('CAMPUS_PLATFORM_ENABLED', 'true')
-    CAMPUS_PLATFORM_URL = os.environ.get('CAMPUS_PLATFORM_URL', 'http://campus-platform.local')
-
-    NOTIFICATION_CHANNELS = ['in_app', 'sms', 'campus_platform']
-
-    APPLICATION_OPEN_HOURS = 72
-    APPROVAL_TIMEOUT_HOURS = 48
-
-    QUOTA_WARNING_THRESHOLD = 0.9
-
-    PUBLICITY_DURATION_DAYS = 7
-
-    DISBURSEMENT_BATCH_SIZE = 100
-
-class DevelopmentConfig(Config):
-    DEBUG = True
-
-class ProductionConfig(Config):
-    DEBUG = False
-
-config = {
-    'development': DevelopmentConfig,
-    'production': ProductionConfig,
-    'default': DevelopmentConfig
-}
+    
+    NOTIFICATION_METHODS = ['system', 'email', 'sms']
+    DEFAULT_NOTIFICATION_METHOD = 'system'
+    
+    APPLICATION_STATUSES = [
+        'submitted', 'reviewed', 'approved', 'rejected', 
+        '公示中', '已发放', '已核销'
+    ]
+    
+    APPROVAL_LEVELS = {
+        1: '院系审核',
+        2: '学校审核', 
+        3: '财务审核'
+    }
+    
+    ROLES = {
+        'student': '学生',
+        'department_admin': '院系管理员',
+        'school_admin': '学校管理员',
+        'financial_admin': '财务管理员',
+        'admin': '系统管理员'
+    }
+    
+    @staticmethod
+    def init_app(app):
+        pass
