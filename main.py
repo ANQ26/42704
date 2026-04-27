@@ -272,7 +272,8 @@ def demonstrate_workflow():
         notification_service = get_notification_service(session)
         
         print("\n[步骤1] 查看可用的奖助金政策...")
-        active_policies = policy_service.get_active_policies()
+        active_policies_result = policy_service.get_active_policies()
+        active_policies = active_policies_result.get('data', {}).get('items', [])
         print(f"当前可用奖助金政策: {len(active_policies)} 个")
         for policy in active_policies:
             print(f"  - {policy['name']} (金额: {policy['amount']}元)")
@@ -292,18 +293,20 @@ def demonstrate_workflow():
         eligibility_result = eligibility_service.check_eligibility(
             student.id, national_scholarship.id
         )
-        print(f"  资格校验结果: {'通过' if eligibility_result['eligible'] else '不通过'}")
-        if eligibility_result['issues']:
-            for issue in eligibility_result['issues']:
+        eligibility_data = eligibility_result.get('data', {})
+        print(f"  资格校验结果: {'通过' if eligibility_data.get('eligible', False) else '不通过'}")
+        if eligibility_data.get('issues'):
+            for issue in eligibility_data['issues']:
                 print(f"    - {issue}")
         
         print("\n[步骤4] 检查院系额度...")
         quota_check = quota_service.check_quota_availability(
             student.department_id, national_scholarship.id
         )
-        print(f"  额度状态: {'可用' if quota_check['available'] else '不足'}")
-        print(f"  总名额: {quota_check.get('quota', '未设置')}, 已使用: {quota_check['used_quota']}")
-        print(f"  总预算: {quota_check.get('budget', '未设置')}元, 已使用: {quota_check['used_budget']}元")
+        quota_data = quota_check.get('data', {})
+        print(f"  额度状态: {'可用' if quota_data.get('available', False) else '不足'}")
+        print(f"  总名额: {quota_data.get('quota', '未设置')}, 已使用: {quota_data['used_quota']}")
+        print(f"  总预算: {quota_data.get('budget', '未设置')}元, 已使用: {quota_data['used_budget']}元")
         
         print("\n[步骤5] 提交申请...")
         submit_result = app_service.submit_application(
@@ -312,81 +315,90 @@ def demonstrate_workflow():
             reason="本人在校期间表现优异，学习成绩名列前茅，积极参与各项活动，特申请国家奖学金。",
             attachments=""
         )
-        print(f"  申请结果: {'成功' if submit_result['success'] else '失败'}")
-        if submit_result['success']:
-            print(f"  申请ID: {submit_result['application_id']}")
+        submit_data = submit_result.get('data', {})
+        print(f"  申请结果: {'成功' if submit_result.get('success', False) else '失败'}")
+        if submit_result.get('success'):
+            print(f"  申请ID: {submit_data.get('application_id')}")
         
         print("\n[步骤6] 查看待审核申请...")
-        pending_approvals = app_service.get_pending_approvals(level=Config.APPROVAL_LEVELS['DEPARTMENT'])
+        pending_result = app_service.get_pending_approvals(level=Config.APPROVAL_LEVELS['DEPARTMENT'])
+        pending_approvals = pending_result.get('data', {}).get('items', [])
         print(f"  待院系审核的申请: {len(pending_approvals)} 个")
         for app in pending_approvals:
-            print(f"    - 申请ID: {app['application_id']}, 学生: {app['student_name']}, 奖助金: {app['scholarship_type']}")
+            print(f"    - 申请ID: {app.get('id')}, 学生: {app.get('student', {}).get('name', '未知')}, 奖助金: {app.get('scholarship_type', {}).get('name', '未知')}")
         
         admin = session.query(User).filter(User.username == "cs_admin").first()
-        if admin and submit_result['success']:
+        application_id = submit_data.get('application_id')
+        
+        if admin and submit_result.get('success') and application_id:
             print("\n[步骤7] 院系审核通过...")
             review_result = app_service.review_application(
-                application_id=submit_result['application_id'],
+                application_id=application_id,
                 reviewer_id=admin.id,
                 approval_status='approved',
                 comments="同意推荐",
                 level=Config.APPROVAL_LEVELS['DEPARTMENT']
             )
-            print(f"  审核结果: {'成功' if review_result['success'] else '失败'}")
-            if review_result['success']:
-                print(f"  申请状态: {review_result['application_status']}")
+            review_data = review_result.get('data', {})
+            print(f"  审核结果: {'成功' if review_result.get('success', False) else '失败'}")
+            if review_result.get('success'):
+                print(f"  申请状态: {review_data.get('application_status')}")
         
         financial_admin = session.query(User).filter(User.username == "financial").first()
-        if financial_admin and submit_result['success']:
+        if financial_admin and submit_result.get('success') and application_id:
             print("\n[步骤8] 学校审核通过...")
             review_result2 = app_service.review_application(
-                application_id=submit_result['application_id'],
+                application_id=application_id,
                 reviewer_id=financial_admin.id,
                 approval_status='approved',
                 comments="同意",
                 level=Config.APPROVAL_LEVELS['SCHOOL']
             )
-            print(f"  审核结果: {'成功' if review_result2['success'] else '失败'}")
+            print(f"  审核结果: {'成功' if review_result2.get('success', False) else '失败'}")
             
             print("\n[步骤9] 财务审核通过...")
             review_result3 = app_service.review_application(
-                application_id=submit_result['application_id'],
+                application_id=application_id,
                 reviewer_id=financial_admin.id,
                 approval_status='approved',
                 comments="财务审核通过",
                 level=Config.APPROVAL_LEVELS['FINANCIAL']
             )
-            print(f"  审核结果: {'成功' if review_result3['success'] else '失败'}")
+            print(f"  审核结果: {'成功' if review_result3.get('success', False) else '失败'}")
         
-        if submit_result['success']:
+        if submit_result.get('success') and application_id:
             print("\n[步骤10] 开始公示...")
-            notice_result = app_service.start_public_notice(submit_result['application_id'])
-            print(f"  公示结果: {'成功' if notice_result['success'] else '失败'}")
+            notice_result = app_service.start_public_notice(application_id)
+            print(f"  公示结果: {'成功' if notice_result.get('success', False) else '失败'}")
             
             print("\n[步骤11] 发放资金...")
             disburse_result = app_service.disburse_application(
-                application_id=submit_result['application_id'],
+                application_id=application_id,
                 bank_account="6222021234567890123",
                 amount=national_scholarship.amount
             )
-            print(f"  发放结果: {'成功' if disburse_result['success'] else '失败'}")
-            if disburse_result['success']:
-                print(f"  发放金额: {disburse_result['amount']}元")
+            disburse_data = disburse_result.get('data', {})
+            print(f"  发放结果: {'成功' if disburse_result.get('success', False) else '失败'}")
+            if disburse_result.get('success'):
+                print(f"  发放金额: {disburse_data.get('amount')}元")
             
             print("\n[步骤12] 资金核销...")
-            if disburse_result['success']:
+            disbursement_id = disburse_data.get('disbursement_id')
+            if disburse_result.get('success') and disbursement_id and financial_admin:
                 verify_result = app_service.verify_disbursement(
-                    disbursement_id=disburse_result['disbursement_id'],
+                    disbursement_id=disbursement_id,
                     verifier_id=financial_admin.id,
                     transaction_id="TXN202404270001"
                 )
-                print(f"  核销结果: {'成功' if verify_result['success'] else '失败'}")
+                print(f"  核销结果: {'成功' if verify_result.get('success', False) else '失败'}")
         
         print("\n[步骤13] 查看学生通知...")
-        notifications = notification_service.get_notifications_by_student(student.id)
+        notifications_result = notification_service.get_notifications_by_student(student.id)
+        notifications = notifications_result.get('data', {}).get('items', [])
         print(f"  收到的通知: {len(notifications)} 条")
         for notification in notifications[:5]:
-            print(f"    - [{Helpers.format_datetime(notification['created_at'])}] {notification['title']}")
+            created_at = notification.get('created_at', '')
+            print(f"    - [{Helpers.format_datetime(created_at)}] {notification.get('title')}")
         
         print("\n" + "="*60)
         print("流程演示完成！")
@@ -403,10 +415,10 @@ def show_statistics():
         
         total_applications = session.query(Application).count()
         total_disbursements = session.query(Disbursement).filter(
-            Disbursement.status == 'verified'
+            Disbursement.status == Config.DISBURSEMENT_STATUS['VERIFIED']
         ).count()
         total_amount = session.query(Disbursement).filter(
-            Disbursement.status == 'verified'
+            Disbursement.status == Config.DISBURSEMENT_STATUS['VERIFIED']
         ).with_entities(
             __import__('sqlalchemy').func.sum(Disbursement.amount)
         ).scalar() or 0
@@ -417,22 +429,26 @@ def show_statistics():
         print(f"  发放总金额: {Helpers.format_currency(total_amount)}")
         
         policy_service = get_policy_service(session)
-        policies = policy_service.get_all_policies()
+        policies_result = policy_service.get_all_policies()
+        policies = policies_result.get('data', {}).get('items', [])
         print(f"\n奖助金政策统计:")
         for policy in policies:
-            stats = policy_service.get_policy_statistics(policy['id'])
-            if 'statistics' in stats:
+            stats_result = policy_service.get_policy_statistics(policy['id'])
+            stats = stats_result.get('data', {})
+            if 'quota_summary' in stats:
+                quota_summary = stats['quota_summary']
                 print(f"\n  {policy['name']}:")
-                print(f"    总名额: {stats['statistics']['total_quota']}")
-                print(f"    已使用: {stats['statistics']['total_used_quota']}")
-                print(f"    名额使用率: {stats['statistics']['quota_utilization']}%")
+                print(f"    总名额: {quota_summary.get('total_quota', 0)}")
+                print(f"    已使用: {quota_summary.get('total_used_quota', 0)}")
+                print(f"    名额使用率: {quota_summary.get('quota_utilization', 0)}%")
         
         notification_service = get_notification_service(session)
-        notify_stats = notification_service.get_notification_statistics()
+        notify_stats_result = notification_service.get_notification_statistics()
+        notify_stats = notify_stats_result.get('data', {})
         print(f"\n通知统计:")
-        print(f"  总通知数: {notify_stats['total_notifications']}")
-        print(f"  未读通知数: {notify_stats['unread_notifications']}")
-        print(f"  阅读率: {notify_stats['read_rate']}%")
+        print(f"  总通知数: {notify_stats.get('total_notifications', 0)}")
+        print(f"  未读通知数: {notify_stats.get('unread_notifications', 0)}")
+        print(f"  阅读率: {notify_stats.get('read_rate', 0)}%")
         
         print("="*60)
 
