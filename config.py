@@ -1,37 +1,58 @@
 import os
 from datetime import datetime
 
-basedir = os.path.abspath(os.path.dirname(__file__))
-
 class Config:
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'scholarship-management-secret-key'
-    
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        'sqlite:///' + os.path.join(basedir, 'scholarship.db')
+    SQLALCHEMY_DATABASE_URI = os.getenv(
+        'DATABASE_URL',
+        'sqlite:///scholarship_management.db'
+    )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
-    NOTIFICATION_METHODS = ['system', 'email', 'sms']
-    DEFAULT_NOTIFICATION_METHOD = 'system'
+    NOTIFICATION_ENABLED = True
+    SMS_ENABLED = False
+    EMAIL_ENABLED = False
     
-    APPLICATION_STATUSES = [
-        'submitted', 'reviewed', 'approved', 'rejected', 
-        '公示中', '已发放', '已核销'
-    ]
+    APPLICATION_STATUS = {
+        'SUBMITTED': 'submitted',
+        'REVIEWING': 'reviewing',
+        'APPROVED': 'approved',
+        'REJECTED': 'rejected',
+        'PUBLIC_NOTICE': 'public_notice',
+        'DISBURSED': 'disbursed',
+        'VERIFIED': 'verified',
+        'CANCELLED': 'cancelled'
+    }
     
     APPROVAL_LEVELS = {
-        1: '院系审核',
-        2: '学校审核', 
-        3: '财务审核'
+        'DEPARTMENT': 1,
+        'SCHOOL': 2,
+        'FINANCIAL': 3
     }
     
-    ROLES = {
-        'student': '学生',
-        'department_admin': '院系管理员',
-        'school_admin': '学校管理员',
-        'financial_admin': '财务管理员',
-        'admin': '系统管理员'
+    USER_ROLES = {
+        'ADMIN': 'admin',
+        'DEPARTMENT_ADMIN': 'department_admin',
+        'FINANCIAL_ADMIN': 'financial_admin',
+        'STUDENT': 'student'
     }
     
-    @staticmethod
-    def init_app(app):
-        pass
+    SCHOLARSHIP_TYPES = {
+        'SCHOLARSHIP': 'scholarship',
+        'GRANT': 'grant'
+    }
+    
+    STUDENT_STATUS = {
+        'ACTIVE': 'active',
+        'GRADUATED': 'graduated',
+        'SUSPENDED': 'suspended',
+        'EXPELLED': 'expelled'
+    }
+    
+    NOTIFICATION_TYPES = {
+        'APPLICATION_REMINDER': 'application_reminder',
+        'APPROVAL_TODO': 'approval_todo',
+        'PUBLIC_NOTICE': 'public_notice',
+        'DISBURSEMENT_PROGRESS': 'disbursement_progress',
+        'QUOTA_WARNING': 'quota_warning',
+        'ELIGIBILITY_CHECK': 'eligibility_check'
+    }

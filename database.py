@@ -8,17 +8,22 @@ from models import Base
 
 engine = create_engine(
     Config.SQLALCHEMY_DATABASE_URI,
+    echo=False,
     connect_args={'check_same_thread': False} if 'sqlite' in Config.SQLALCHEMY_DATABASE_URI else {}
 )
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+SessionFactory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Session = scoped_session(SessionFactory)
 
 def init_db():
     Base.metadata.create_all(bind=engine)
 
+def drop_db():
+    Base.metadata.drop_all(bind=engine)
+
 @contextmanager
-def get_db_session():
-    session = SessionLocal()
+def get_session():
+    session = Session()
     try:
         yield session
         session.commit()
@@ -28,5 +33,5 @@ def get_db_session():
     finally:
         session.close()
 
-def get_session():
-    return SessionLocal()
+def get_db_session():
+    return Session()
